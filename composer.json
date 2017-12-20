@@ -1,0 +1,26 @@
+{
+  "name": "setranmedia/wppluginner",
+  "homepage": "https://github.com/setranmedia/wp-pluginner",
+  "type": "library",
+  "description": "WordPress framework for Laravel developers",
+  "keywords": [ "wordpress", "laravel", "framework", "wpbones", "plugins", "themes" ],
+  "license": "GPL-3.0",
+  "authors": [
+      {
+          "name": "Pijar Inspirator",
+          "email": "setranmedia@gmail.com",
+          "homepage": "https://www.setranmedia.com"
+      }
+  ],
+  "require": {
+    "php": ">=5.6.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "SetranMedia\\WpPluginner\\": "src/"
+    },
+    "files": [
+      "src/helpers.php"
+    ]
+  }
+}
