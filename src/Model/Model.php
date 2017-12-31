@@ -1,5 +1,5 @@
 <?php
-namespace SetranMedia\WpPluginner\Foundation;
+namespace SetranMedia\WpPluginner\Model;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 
 class Model extends EloquentModel {

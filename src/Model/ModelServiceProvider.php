@@ -1,6 +1,6 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Foundation;
+namespace SetranMedia\WpPluginner\Model;
 
 use SetranMedia\WpPluginner\Support\ServiceProvider;
 use Illuminate\Database\Capsule\Manager as Capsule;

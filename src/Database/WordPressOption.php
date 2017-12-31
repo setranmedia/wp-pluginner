@@ -32,6 +32,7 @@ class WordPressOption implements \ArrayAccess
    * @var Plugin
    */
   protected $plugin = null;
+  protected $options_name = null;
 
   /**
    * Option record.
@@ -60,20 +61,21 @@ class WordPressOption implements \ArrayAccess
 
     if ( ! is_null( $plugin ) ) {
       $this->plugin = $plugin;
+      $this->options_name = $plugin->slug.'_options';
 
       // in $this->row you'll fond a stdClass with column/property
-      $this->row = $wpdb->get_row( "SELECT * FROM {$this->tableName} WHERE option_name='{$plugin->slug}'" );
+      $this->row = $wpdb->get_row( "SELECT * FROM {$this->tableName} WHERE option_name='{$this->options_name}'" );
 
       if ( is_null( $this->row ) ) {
-        $options = include $this->plugin->getBasePath() . '/config/options.php';
+        $options = include $this->plugin->wpPropertiesPath . '/options.php';
 
         $values = [
-          'option_name'  => $this->plugin->slug,
+          'option_name'  => $this->options_name,
           'option_value' => json_encode( $options )
         ];
         $result = $wpdb->insert( $this->tableName, $values );
 
-        $this->row = $wpdb->get_row( "SELECT * FROM {$this->tableName} WHERE option_name='{$plugin->slug}'" );
+        $this->row = $wpdb->get_row( "SELECT * FROM {$this->tableName} WHERE option_name='{$this->options_name}'" );
       }
 
       if ( isset( $this->row->option_value ) && ! empty( $this->row->option_value ) ) {
@@ -235,7 +237,7 @@ class WordPressOption implements \ArrayAccess
       'option_value' => json_encode( $this->_value )
     ];
 
-    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->plugin->slug ] );
+    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
 
     return $this->_value;
   }
@@ -261,7 +263,7 @@ class WordPressOption implements \ArrayAccess
       'option_value' => json_encode( $mergeOptions )
     ];
 
-    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->plugin->slug ] );
+    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
 
     $this->_value = (array) json_decode( $values[ 'option_value' ], true );
 
@@ -282,7 +284,7 @@ class WordPressOption implements \ArrayAccess
       return $this->reset();
     }
 
-    $options = include $this->plugin->getBasePath() . '/config/options.php';
+    $options = include $this->plugin->wpPropertiesPath . '/options.php';
 
     $mergeOptions = $this->__delta( $options, $this->_value );
 
@@ -290,7 +292,7 @@ class WordPressOption implements \ArrayAccess
       'option_value' => json_encode( $mergeOptions )
     ];
 
-    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->plugin->slug ] );
+    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
 
     $this->_value = (array) json_decode( $values[ 'option_value' ], true );
 
@@ -307,14 +309,14 @@ class WordPressOption implements \ArrayAccess
   {
     global $wpdb;
 
-    $options = include $this->plugin->getBasePath() . '/config/options.php';
+    $options = include $this->plugin->wpPropertiesPath . '/options.php';
 
     $values = [
-      'option_name'  => $this->plugin->slug,
+      'option_name'  => $this->options_name,
       'option_value' => json_encode( $options )
     ];
 
-    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->plugin->slug ] );
+    $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
 
     $this->_value = (array) json_decode( $values[ 'option_value' ], true );
 

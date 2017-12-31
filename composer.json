@@ -2,12 +2,12 @@
   "name": "setranmedia/wp-pluginner",
   "homepage": "https://github.com/setranmedia/wp-pluginner",
   "type": "project",
-  "description": "WordPress framework for Laravel developers",
-  "keywords": [ "wordpress", "laravel", "framework", "wpbones", "plugins", "themes" ],
+  "description": "WordPress plugin framework for Laravel developers",
+  "keywords": [ "wordpress", "laravel", "framework", "plugins" ],
   "license": "MIT",
   "authors": [
       {
-          "name": "Pijar Inspirator",
+          "name": "Pijar Aji Pratama",
           "email": "setranmedia@gmail.com",
           "homepage": "https://www.setranmedia.com"
       }

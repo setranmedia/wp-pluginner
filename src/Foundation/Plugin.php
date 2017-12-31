@@ -7,6 +7,7 @@ use SetranMedia\WpPluginner\Database\WordPressOption;
 use SetranMedia\WpPluginner\View\View;
 use SetranMedia\WpPluginner\Contracts\Foundation\Plugin as PluginContract;
 use SetranMedia\WpPluginner\Foundation\Http\Request;
+use SetranMedia\WpPluginner\Foundation\Config;
 use SetranMedia\WpPluginner\Support\Str;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -14,68 +15,26 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class Plugin extends Container implements PluginContract
 {
 
-    /**
-    * The current globally available container (if any).
-    *
-    * @var static
-    */
     protected static $instance;
-
-    /**
-    * Buld in __FILE__ relative plugin.
-    *
-    * @var string
-    */
     protected $file;
-
-    /**
-    * The base path for the plugin installation.
-    *
-    * @var string
-    */
     protected $basePath;
-
-    /**
-    * The base uri for the plugin installation.
-    *
-    * @var string
-    */
     protected $baseUri;
+    protected $configer;
+    protected $viewer;
 
-    /**
-    * Internal use where store the plugin data.
-    *
-    * @var array
-    */
     protected $pluginData = [];
-
-    /**
-    * A key value pairs array with the list of providers.
-    *
-    * @var array
-    */
     protected $provides = [];
-
     private $_options = null;
-
     private $_request = null;
-
-    /**
-    * The slug of this plugin.
-    *
-    * @var string
-    */
     public $slug = "";
 
-    public function __construct( $basePath )
-    {
+    public function __construct( $basePath ){
         $this->basePath = rtrim( $basePath, '\/' );
-
-        $this->boot();
+        $this->bootPlugin();
+        $this->bootWPIntegration();
     }
 
-    public function __get( $name )
-    {
+    public function __get( $name ){
         $method = 'get' . Str::studly( $name ) . 'Attribute';
         if ( method_exists( $this, $method ) ) {
             return $this->{$method}();
@@ -88,88 +47,40 @@ class Plugin extends Container implements PluginContract
         }
     }
 
-    public function boot()
+    public function bootPlugin()
     {
-        // emule __FILE__
         $this->file = $this->basePath . '/plugin.php';
 
         $this->baseUri = rtrim( plugin_dir_url( $this->file ), '\/' );
-
-        // Use WordPress get_plugin_data() function for auto retrive plugin information.
         if ( ! function_exists( 'get_plugin_data' ) ) {
             require_once( ABSPATH . 'wp-admin/includes/plugin.php' );
         }
         $this->pluginData = get_plugin_data( $this->file, false );
 
-        /*
-        * In $this->pluginData you'll find all WordPress
-        *
-        Author = "Giovambattista Fazioli"
-        AuthorName = "Giovambattista Fazioli"
-        AuthorURI = "http://undolog.com"
-        Description = "WP Kirk is a WP Bones boilperate plugin"
-        DomainPath = "localization"
-        Name = "WP Kirk"
-        Network = false
-        PluginURI = "http://undolog.com"
-        TextDomain = "wp-kirk"
-        Title = "WP Kirk"
-        Version = "1.0.0"
-
-        */
-
-        // plugin slug
-        $this->slug = str_replace( "-", "_", sanitize_title( $this->Name ) ) . "_slug";
-
-        // Load text domain
-        load_plugin_textdomain( $this->TextDomain, false, trailingslashit( basename( $this->basePath ) ) . $this->DomainPath );
-
-        // Activation & Deactivation Hook
-        register_activation_hook( $this->file, [ $this, 'activation' ] );
-        register_deactivation_hook( $this->file, [ $this, 'deactivation' ] );
-
-        /*
-        * There are many pitfalls to using the uninstall hook. It ’ s a much cleaner, and easier, process to use the
-        * uninstall.php method for removing plugin settings and options when a plugin is deleted in WordPress.
-        *
-        * Using uninstall.php file. This is typically the preferred method because it keeps all your uninstall code in a
-        * separate file. To use this method, create an uninstall.php file and place it in the root directory of your
-        * plugin. If this file exists WordPress executes its contents when the plugin is deleted from the WordPress
-        * Plugins screen page.
-        *
-        */
-
-        // register_uninstall_hook( $file, array( $this, 'uninstall' ) );
-
-        // Fires after WordPress has finished loading but before any headers are sent.
-        add_action( 'init', array( $this, 'init' ) );
-
-        // Fires before the administration menu loads in the admin.
-        add_action( 'admin_menu', array( $this, 'admin_menu' ) );
-
-        // Fires after all default WordPress widgets have been registered.
-        add_action( 'widgets_init', [ $this, 'widgets_init' ] );
-
-        // Filter a screen option value before it is set.
-        add_filter( 'set-screen-option', [ $this, 'set_screen_option' ], 10, 3 );
+        $this->slug = str_replace( "-", "_", sanitize_title( $this->Name ) );
 
         static::$instance = $this;
 
+        $this->configer = new Config();
+        $this->configer->loadConfigurationFiles($this->configPath);
+
+        $this->viewer = new View($this);
         return $this;
 
     }
 
-    public function set_screen_option( $status, $option, $value )
-    {
-        if ( in_array( $option, array_keys( $this->config( 'plugin.screen_options', [] ) ) ) ) {
-            return $value;
-        }
+    public function bootWPIntegration(){
+        load_plugin_textdomain( $this->TextDomain, false, trailingslashit( basename( $this->basePath ) ) . $this->DomainPath );
 
-        return $status;
+        register_activation_hook( $this->file, [ $this, 'activation' ] );
+        register_deactivation_hook( $this->file, [ $this, 'deactivation' ] );
+
+        add_action( 'init', array( $this, 'init' ) );
+
+        add_action( 'admin_menu', array( $this, 'admin_menu' ) );
     }
 
-    public function getOptionsAttribute()
-    {
+    public function getOptionsAttribute(){
         if ( is_null( $this->_options ) ) {
             $this->_options = new WordPressOption( $this );
         }
@@ -177,8 +88,7 @@ class Plugin extends Container implements PluginContract
         return $this->_options;
     }
 
-    public function getRequestAttribute()
-    {
+    public function getRequestAttribute(){
         if ( is_null( $this->_request ) ) {
             $this->_request = new Request();
         }
@@ -186,132 +96,93 @@ class Plugin extends Container implements PluginContract
         return $this->_request;
     }
 
-    public function getPluginBasenameAttribute()
-    {
+    public function getPluginBasenameAttribute(){
         return plugin_basename( $this->file );
     }
 
-    /**
-    * Get the base path of the plugin installation.
-    *
-    * @return string
-    */
-    public function getBasePath()
-    {
+    public function getBasePath(){
         return $this->basePath;
     }
 
-    /**
-    * Return the absolute URL for the installation plugin.
-    *
-    * @return string
-    */
-    public function getBaseUri()
-    {
+    public function getBasePathAttribute(){
+        return $this->basePath;
+    }
+
+    public function getAppPathAttribute(){
+        return $this->basePath.'/'.$this->config('path.app');
+    }
+
+    public function getConfigPathAttribute(){
+        return $this->basePath.'/config';
+    }
+
+    public function getDatabasePathAttribute(){
+        return $this->basePath.'/'.$this->config('path.database');
+    }
+
+    public function getLocalizationPathAttribute(){
+        return $this->basePath.'/'.$this->config('path.localization');
+    }
+
+    public function getPublicPathAttribute(){
+        return $this->basePath.'/'.$this->config('path.public');
+    }
+
+    public function getResourcePathAttribute(){
+        return $this->basePath.'/'.$this->config('path.resources');
+    }
+
+    public function getStoragePathAttribute(){
+        return $this->basePath.'/'.$this->config('path.storage');
+    }
+
+    public function getWpPropertiesPathAttribute(){
+        return $this->basePath.'/'.$this->config('path.wp_properties');
+    }
+
+    public function getBaseUriAttribute(){
         return $this->baseUri;
     }
 
-    public function getCssAttribute()
-    {
+    public function getPublicUriAttribute(){
+        return $this->baseUri.'/'.$this->config('path.public');;
+    }
+
+    public function getCssAttribute(){
         return $this->baseUri . '/public/css';
     }
 
-    public function getJsAttribute()
-    {
+    public function getJsAttribute(){
         return $this->baseUri . '/public/js';
     }
 
-    public function getImagesAttribute()
-    {
+    public function getImagesAttribute(){
         return $this->baseUri . '/public/images';
     }
 
-    public function vendor( $vendor = "wpbones" )
-    {
+    public function vendor( $vendor = "setranmedia" ){
         return $this->baseUri . "/vendor/$vendor";
     }
 
-    /**
-    * Get / set the specified configuration value.
-    *
-    * If an array is passed as the key, we will assume you want to set an array of values.
-    *
-    * @param  array|string $key
-    * @param  mixed        $default
-    *
-    * @return mixed
-    */
-    public function config( $key = null, $default = null )
-    {
-        if ( is_null( $key ) ) {
-            return [];
-        }
-
-        $parts = explode( ".", $key );
-
-        $filename = $parts[ 0 ] . ".php";
-        $key      = isset( $parts[ 1 ] ) ? $parts[ 1 ] : null;
-
-        $array = include $this->basePath . '/config/' . $filename;
-
-        if ( is_null( $key ) ) {
-            return $array;
-        }
-
-        if ( isset( $array[ $key ] ) ) {
-            return $array[ $key ];
-        }
-
-        unset( $parts[ 0 ] );
-
-        foreach ( $parts as $segment ) {
-            if ( ! is_array( $array ) || ! array_key_exists( $segment, $array ) ) {
-                return wpbones_value( $default );
-            }
-
-            $array = $array[ $segment ];
-        }
-
-        return $array;
+    public function config($key=null,$default=null){
+        if($key) return $this->configer->get($key,$default);
+        return $this->configer;
     }
 
-    /**
-    * Gets the value of an environment variable. Supports boolean, empty and null.
-    *
-    * @param  string $key
-    * @param  mixed  $default
-    *
-    * @return mixed
-    */
-    public function env( $key, $default = null )
-    {
+    public function env( $key, $default = null ){
         return wpbones_env( $key, $default );
     }
 
-    /**
-    * Return an instance of View/Contract.
-    *
-    * @param null $key  Optional. Default null.
-    * @param null $data Optional. Default null.
-    *
-    * @return \SetranMedia\WpPluginner\View\View
-    */
-    public function view( $key = null, $data = null )
-    {
+    public function view( $key = null, $data = null ){
 
-        $view = new View( $this, $key, $data );
+        if($key) $this->viewer->setKey($key);
+        if($data) $this->viewer->setData($data);
 
-        return $view;
+        return $this->viewer;
 
     }
 
-    /**
-    * Return TRUE if an Ajax called
-    *
-    * @return bool
-    */
-    public function isAjax()
-    {
+    public function isAjax(){
         if ( defined( 'DOING_AJAX' ) ) {
             return true;
         }
@@ -322,13 +193,11 @@ class Plugin extends Container implements PluginContract
         return false;
     }
 
-    public function getPageUrl( $pageSlug )
-    {
+    public function getPageUrl( $pageSlug ){
         return add_query_arg( array( 'page' => $pageSlug ), admin_url( 'admin.php' ) );
     }
 
-    public function provider( $name )
-    {
+    public function provider( $name ){
 
         foreach ( $this->provides as $key => $value ) {
 
@@ -349,78 +218,13 @@ class Plugin extends Container implements PluginContract
     |
     */
 
-    /**
-    * Called when a plugin is activate; `register_activation_hook()`
-    *
-    */
-    public function activation()
-    {
-        $this->options->delta();
-
-        // include your own activation
-        $activation = include_once $this->basePath . '/wp-properties/hooks/activation.php';
-
-        // migrations
-        foreach ( glob( $this->basePath . '/database/migrations/*.php' ) as $filename ) {
-            include $filename;
-            foreach ( $this->getFileClasses( $filename ) as $className ) {
-                $instance = new $className;
-            }
-        }
-
-        // seeders
-        foreach ( glob( $this->basePath . '/database/seeds/*.php' ) as $filename ) {
-            include $filename;
-            foreach ( $this->getFileClasses( $filename ) as $className ) {
-                $instance = new $className;
-            }
-        }
-    }
-
-    /**
-    * Called when a plugin is deactivate; `register_deactivation_hook()`
-    *
-    */
-    public function deactivation()
-    {
-        $deactivation = include_once $this->basePath . '/wp-properties/hooks/deactivation.php';
-    }
-
-    /**
-    * Fires after WordPress has finished loading but before any headers are sent.
-    *
-    * Most of WP is loaded at this stage, and the user is authenticated. WP continues
-    * to load on the init hook that follows (e.g. widgets), and many plugins instantiate
-    * themselves on it for all sorts of reasons (e.g. they need a user, a taxonomy, etc.).
-    *
-    * If you wish to plug an action once WP is loaded, use the wp_loaded hook below.
-    *
-    */
-    public function init()
-    {
-        $init = include $this->basePath . '/config/plugin.php';
+    public function init(){
+        $init = $this->config()->get('plugin',false);
 
         if ( is_array( $init ) ) {
 
             // Here we are going to init Service Providers
 
-            // Custom post types Service Provider
-            if ( isset( $init[ 'custom_post_types' ] ) && ! empty( $init[ 'custom_post_types' ] ) ) {
-                foreach ( $init[ 'custom_post_types' ] as $className ) {
-                    $object = new $className;
-                    $object->register();
-                    $this->provides[ $className ] = $object;
-                }
-            }
-
-            // Custom taxonomy type Service Provider
-            if ( isset( $init[ 'custom_taxonomy_types' ] ) && ! empty( $init[ 'custom_taxonomy_types' ] ) ) {
-                foreach ( $init[ 'custom_taxonomy_types' ] as $className ) {
-                    $object = new $className;
-                    $object->register();
-                    $this->provides[ $className ] = $object;
-                }
-            }
 
             // Shortcodes Service Provider
             if ( isset( $init[ 'shortcodes' ] ) && ! empty( $init[ 'shortcodes' ] ) ) {
@@ -450,35 +254,16 @@ class Plugin extends Container implements PluginContract
                     $this->provides[ $className ] = $object;
                 }
             }
-            $this->development();
-        }
-    }
-
-    public function development()
-    {
-        $init = include $this->basePath . '/config/development.php';
-
-        if ( is_array( $init ) && isset($init['active']) && $init['active'] ) {
-
-            // Custom service provider
-            if ( isset( $init[ 'providers' ] ) && ! empty( $init[ 'providers' ] ) ) {
-                foreach ( $init[ 'providers' ] as $className ) {
-                    $object = new $className;
-                    $object->register();
-                    $this->provides[ $className ] = $object;
-                }
-            }
         }
     }
 
     /**
     * Fires before the administration menu loads in the admin.
     */
-    public function admin_menu()
-    {
+    public function admin_menu(){
         global $admin_page_hooks, $_registered_pages, $_parent_pages;
 
-        $menus = include_once $this->basePath . '/config/menus.php';
+        $menus = $this->config()->get('menus',false);
 
         if ( ! empty( $menus ) && is_array( $menus ) ) {
 
@@ -523,11 +308,8 @@ class Plugin extends Container implements PluginContract
                     // key could be a number
                     $key = str_replace( '-', "_", sanitize_title( $key ) );
 
-                    $array     = explode( '\\', __NAMESPACE__ );
-                    $namespace = sanitize_title( $array[ 0 ] );
-
                     // submenu slug
-                    $submenuSlug = "{$namespace}_{$key}";
+                    $submenuSlug = "{$topLevelSlug}_{$key}";
 
                     if ( $firstMenu ) {
                         $firstMenu   = false;
@@ -557,7 +339,7 @@ class Plugin extends Container implements PluginContract
         }
 
         // custom hidden pages
-        $pages = include_once $this->basePath . '/config/routes.php';
+        $pages = $this->config()->get('routes',false);
 
         if ( ! empty( $pages ) && is_array( $pages ) ) {
             foreach ( $pages as $pageSlug => $page ) {
@@ -577,18 +359,39 @@ class Plugin extends Container implements PluginContract
         }
     }
 
-    public function widgets_init()
-    {
-        global $wp_widget_factory;
+    /**
+    * Called when a plugin is activate; `register_activation_hook()`
+    *
+    */
+    public function activation(){
+        $this->options->delta();
 
-        $init = include $this->basePath . '/config/plugin.php';
+        // include your own activation
+        $activation = include_once $this->wpPropertiesPath . '/hooks/activation.php';
 
-        if ( isset( $init[ 'widgets' ] ) && is_array( $init[ 'widgets' ] ) && ! empty( $init[ 'widgets' ] ) ) {
-            foreach ( $init[ 'widgets' ] as $className ) {
-                //register_widget( $className );
-                $wp_widget_factory->widgets[ $className ] = new $className( $this );
+        // migrations
+        foreach ( glob( $this->databasePath . '/migrations/*.php' ) as $filename ) {
+            include $filename;
+            foreach ( $this->getFileClasses( $filename ) as $className ) {
+                $instance = new $className;
             }
         }
+
+        // seeders
+        foreach ( glob( $this->databasePath . '/seeds/*.php' ) as $filename ) {
+            include $filename;
+            foreach ( $this->getFileClasses( $filename ) as $className ) {
+                $instance = new $className;
+            }
+        }
+    }
+
+    /**
+    * Called when a plugin is deactivate; `register_deactivation_hook()`
+    *
+    */
+    public function deactivation(){
+        $deactivation = include_once $this->wpPropertiesPath . '/hooks/deactivation.php';
     }
 
     // -- private

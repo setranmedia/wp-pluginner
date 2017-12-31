@@ -8,66 +8,29 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 class View
 {
-
-    /**
-    * A plugin instance container.
-    *
-    * @var $container
-    */
     protected $container;
     protected $key;
     protected $data;
 
-    /**
-    * List of styles and script to enqueue in admin area.
-    *
-    * @var array
-    */
     protected $adminStyles  = [];
     protected $adminScripts = [];
+    protected $adminLocalizes = [];
 
-    /**
-    * List of styles and script to enqueue in frontend.
-    *
-    * @var array
-    */
     protected $styles  = [];
     protected $scripts = [];
 
-    /**
-    * Create a new View.
-    *
-    * @param mixed $container Usually a container/plugin.
-    * @param null  $key       Optional. This is the path of view.
-    * @param null  $data      Optional. Any data to pass to view.
-    */
-    public function __construct( $container, $key = null, $data = null )
+    public function __construct( $container )
     {
         $this->container = $container;
-        $this->key       = $key;
-        $this->data      = $data;
-        $adminStyles = $this->container->config('enqueue.admin_enqueue_styles',[]);
-        if($adminStyles && is_array($adminStyles) && !empty($adminStyles)){
-            foreach($adminStyles as $style){
-
-            }
-        }
     }
 
-    /**
-    * Get the filename.
-    *
-    * @return string
-    */
-    protected function filename()
-    {
+    protected function filename(){
         $filename = str_replace( '.', '/', $this->key ) . '.php';
 
         return $filename;
     }
 
-    protected function admin_print_styles()
-    {
+    protected function admin_print_styles(){
         if ( ! empty( $this->adminStyles ) ) {
             foreach ( $this->adminStyles as $style ) {
                 $deps = isset($style[2]) ? $style[2] : array();
@@ -78,8 +41,7 @@ class View
         }
     }
 
-    protected function admin_enqueue_scripts()
-    {
+    protected function admin_enqueue_scripts(){
         if ( ! empty( $this->adminScripts ) ) {
             foreach ( $this->adminScripts as $script ) {
                 $deps = isset($script[2]) ? $script[2] : array();
@@ -90,8 +52,15 @@ class View
         }
     }
 
-    protected function wp_print_styles()
-    {
+    protected function admin_localize_scripts(){
+        if ( ! empty( $this->adminLocalizes ) ) {
+            foreach ( $this->adminLocalizes as $script ) {
+                wp_localize_script( $script[ 0 ], $script[1], $script[2] );
+            }
+        }
+    }
+
+    protected function wp_print_styles(){
         if ( ! empty( $this->styles ) ) {
             foreach ( $this->styles as $style ) {
                 $deps = isset($style[2]) ? $style[2] : array();
@@ -102,8 +71,7 @@ class View
         }
     }
 
-    protected function wp_enqueue_scripts()
-    {
+    protected function wp_enqueue_scripts(){
         if ( ! empty( $this->scripts ) ) {
             foreach ( $this->scripts as $script ) {
                 $deps = isset($script[2]) ? $script[2] : array();
@@ -114,21 +82,17 @@ class View
         }
     }
 
-    /**
-    * Get the string rappresentation of a view.
-    *
-    * @return string
-    */
-    public function __toString()
-    {
+    public function __toString(){
         return (string) $this->render();
     }
 
-    public function render()
-    {
+    public function render($key = null, $data = null){
+        if($key) $this->key = $key;
+        if($data) $this->data = $data;
 
         if ( ! $this->container->isAjax() ) {
             $this->admin_enqueue_scripts();
+            $this->admin_localize_scripts();
             $this->admin_print_styles();
             $this->wp_enqueue_scripts();
             $this->wp_print_styles();
@@ -139,7 +103,7 @@ class View
 
             // make available plugin instance
             $plugin = $this->container;
-            $blade = new Blade($plugin->getBasePath() . '/resources/views', $plugin->getBasePath() . '/storage/framework/views');
+            $blade = new Blade($plugin->resourcePath . '/views', $plugin->storagePath . '/plugin/views');
             if ( ! is_null( $this->data ) && is_array( $this->data ) ) {
                 echo $blade->make($this->key, $this->data)->with('plugin',$plugin);
             }
@@ -159,82 +123,37 @@ class View
         return $func();
     }
 
-    /**
-    * Load a new css resource in admin area.
-    *
-    * @param string $name Name of style.
-    * @param array  $deps Optional. Array of slug deps
-    * @param array  $ver  Optional. Version.
-    *
-    * @return $this
-    */
-    public function withAdminStyles( $handle, $src = '', $deps = [], $ver = false, $media = 'all' )
-    {
+    public function withAdminStyles( $handle, $src = '', $deps = [], $ver = false, $media = 'all' ){
         $this->adminStyles[] = [ $handle, $src, $deps, $ver, $media ];
 
         return $this;
     }
 
-    /**
-    * Load a new css resource in admin area.
-    *
-    * @param string $name Name of script.
-    * @param array  $deps Optional. Array of slug deps
-    * @param array  $ver  Optional. Version.
-    *
-    * @return $this
-    */
-    public function withAdminScripts( $handle, $src = '', $deps = [], $ver = false, $in_footer = false )
-    {
+    public function withAdminScripts( $handle, $src = '', $deps = [], $ver = false, $in_footer = false ){
         $this->adminScripts[] = [ $handle, $src, $deps, $ver, $in_footer ];
 
         return $this;
     }
 
-    /**
-    * Load a new css resource in frontend.
-    *
-    * @param string $name Name of style.
-    * @param array  $deps Optional. Array of slug deps
-    * @param array  $ver  Optional. Version.
-    *
-    * @return $this
-    */
-    public function withStyles( $name, $deps = [], $ver = [] )
-    {
+    public function withAdminLocalizeScripts( $handle, $name, $data = null ){
+        $this->adminLocalizes[] = [ $handle, $name, $data ];
+
+        return $this;
+    }
+
+    public function withStyles( $name, $deps = [], $ver = [] ){
         $this->styles[] = [ $name, $deps, $ver ];
 
         return $this;
     }
 
-    /**
-    * Load a new css resource in fonrend.
-    *
-    * @param string $name Name of script.
-    * @param array  $deps Optional. Array of slug deps
-    * @param array  $ver  Optional. Version.
-    *
-    * @return $this
-    */
-    public function withScripts( $name, $deps = [], $ver = [] )
-    {
+    public function withScripts( $name, $deps = [], $ver = [] ){
         $this->scripts[] = [ $name, $deps, $ver ];
 
         return $this;
     }
 
-    /**
-    * Data to pass to the view.
-    *
-    * @param mixed $data Array or single data.
-    *
-    * @example     $instance->with( 'foo', 'bar' )
-    * @example     $instance->with( [ 'foo' => 'bar' ] )
-    *
-    * @return $this
-    */
-    public function with( $data )
-    {
+    public function with( $data ){
         if ( is_array( $data ) ) {
             $this->data[] = $data;
         }
@@ -243,6 +162,14 @@ class View
         }
 
         return $this;
+    }
+
+    public function setKey($key){
+        $this->key = $key;
+    }
+
+    public function setData($data){
+        $this->data = $data;
     }
 
 }
