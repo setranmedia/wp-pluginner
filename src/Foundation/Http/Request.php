@@ -2,7 +2,7 @@
 
 namespace SetranMedia\WpPluginner\Foundation\Http;
 
-use SetranMedia\WpPluginner\Support\Str;
+use Illuminate\Support\Str;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 

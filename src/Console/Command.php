@@ -2,7 +2,7 @@
 
 namespace SetranMedia\WpPluginner\Console;
 
-use SetranMedia\WpPluginner\Support\Str;
+use Illuminate\Support\Str;
 
 abstract class Command
 {

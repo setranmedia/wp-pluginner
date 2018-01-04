@@ -2,206 +2,214 @@
 
 namespace SetranMedia\WpPluginner\Foundation;
 
-use SetranMedia\WpPluginner\Container\Container;
 use SetranMedia\WpPluginner\Database\WordPressOption;
 use SetranMedia\WpPluginner\View\View;
-use SetranMedia\WpPluginner\Contracts\Foundation\Plugin as PluginContract;
 use SetranMedia\WpPluginner\Foundation\Http\Request;
 use SetranMedia\WpPluginner\Foundation\Config;
-use SetranMedia\WpPluginner\Support\Str;
+use Illuminate\Support\Str;
+use League\Flysystem\Filesystem;
+use League\Flysystem\Adapter\Local;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class Plugin extends Container implements PluginContract
+class Plugin
 {
 
     protected static $instance;
     protected $file;
     protected $basePath;
     protected $baseUri;
-    protected $configer;
-    protected $viewer;
 
     protected $pluginData = [];
     protected $provides = [];
     private $_options = null;
     private $_request = null;
+    protected $_config = null;
+    protected $_view = null;
+    protected $_storage = null;
     public $slug = "";
 
-    public function __construct( $basePath ){
+    public function __construct( $basePath )
+    {
         $this->basePath = rtrim( $basePath, '\/' );
+        $this->bootFramework();
         $this->bootPlugin();
-        $this->bootWPIntegration();
     }
 
-    public function __get( $name ){
-        $method = 'get' . Str::studly( $name ) . 'Attribute';
-        if ( method_exists( $this, $method ) ) {
+    public function __get( $name )
+    {
+        $path = [
+            'base' => '',
+            'app' => 'app',
+            'bootstrap' => 'bootstrap',
+            'config' => 'config',
+            'database' => 'database',
+            'localization' => 'localization',
+            'public' => 'public',
+            'resource' => 'resources',
+            'storage' => 'storage',
+            'vendor' => 'vendor',
+            'wp_properties' => 'wp-properties'
+        ];
+        if (substr($name,-5) == '_path') {
+            $pathCalled = str_replace('_path','',$name);
+            if (isset($path[$pathCalled])) {
+                return trailingslashit($this->basePath) . $path[$pathCalled];
+            }
+        }
+
+        $method = 'get' . Str::studly($name) . 'Attribute';
+        if (method_exists($this, $method)) {
             return $this->{$method}();
         }
 
-        foreach ( $this->pluginData as $key => $value ) {
-            if ( $name == $key ) {
+        foreach ($this->pluginData as $key => $value) {
+            if ($name == $key) {
                 return $value;
             }
         }
     }
 
-    public function bootPlugin()
+    protected function bootFramework()
     {
-        $this->file = $this->basePath . '/plugin.php';
+        $this->file = trailingslashit($this->basePath) . 'plugin.php';
 
-        $this->baseUri = rtrim( plugin_dir_url( $this->file ), '\/' );
-        if ( ! function_exists( 'get_plugin_data' ) ) {
-            require_once( ABSPATH . 'wp-admin/includes/plugin.php' );
+        $this->baseUri = rtrim(plugin_dir_url($this->file), '\/');
+        if (!function_exists('get_plugin_data')) {
+            require_once(ABSPATH . 'wp-admin/includes/plugin.php');
         }
-        $this->pluginData = get_plugin_data( $this->file, false );
-
-        $this->slug = str_replace( "-", "_", sanitize_title( $this->Name ) );
+        $this->pluginData = get_plugin_data($this->file, false);
 
         static::$instance = $this;
 
-        $this->configer = new Config();
-        $this->configer->loadConfigurationFiles($this->configPath);
+        $storageAdapter = new Local($this->storage_path.'/app');
+        $this->_storage = new Filesystem($storageAdapter);
 
-        $this->viewer = new View($this);
         return $this;
-
     }
 
-    public function bootWPIntegration(){
-        load_plugin_textdomain( $this->TextDomain, false, trailingslashit( basename( $this->basePath ) ) . $this->DomainPath );
+    protected function bootPlugin()
+    {
+        $this->slug = $this->config->get('plugin.slug');
 
         register_activation_hook( $this->file, [ $this, 'activation' ] );
         register_deactivation_hook( $this->file, [ $this, 'deactivation' ] );
 
         add_action( 'init', array( $this, 'init' ) );
 
-        add_action( 'admin_menu', array( $this, 'admin_menu' ) );
+        add_action( 'admin_menu', array( $this, 'adminMenu' ) );
     }
 
-    public function getOptionsAttribute(){
-        if ( is_null( $this->_options ) ) {
+    public function getOptionsAttribute()
+    {
+        if (is_null($this->_options)) {
             $this->_options = new WordPressOption( $this );
         }
 
         return $this->_options;
     }
 
-    public function getRequestAttribute(){
-        if ( is_null( $this->_request ) ) {
+    public function getRequestAttribute()
+    {
+        if (is_null($this->_request)) {
             $this->_request = new Request();
         }
 
         return $this->_request;
     }
 
-    public function getPluginBasenameAttribute(){
+    public function getConfigAttribute()
+    {
+        if (is_null($this->_config)) {
+            $this->_config = new Config();
+            $this->_config->loadConfigurationFiles($this->config_path);
+        }
+
+        return $this->_config;
+    }
+
+    public function getViewAttribute()
+    {
+        if (is_null($this->_view)) {
+            $this->_view = new View($this);
+        }
+
+        return $this->_view;
+    }
+
+    public function getPluginBasenameAttribute()
+    {
         return plugin_basename( $this->file );
     }
 
-    public function getBasePath(){
+    public function getBasePath()
+    {
         return $this->basePath;
     }
 
-    public function getBasePathAttribute(){
-        return $this->basePath;
-    }
-
-    public function getAppPathAttribute(){
-        return $this->basePath.'/'.$this->config('path.app');
-    }
-
-    public function getConfigPathAttribute(){
-        return $this->basePath.'/config';
-    }
-
-    public function getDatabasePathAttribute(){
-        return $this->basePath.'/'.$this->config('path.database');
-    }
-
-    public function getLocalizationPathAttribute(){
-        return $this->basePath.'/'.$this->config('path.localization');
-    }
-
-    public function getPublicPathAttribute(){
-        return $this->basePath.'/'.$this->config('path.public');
-    }
-
-    public function getResourcePathAttribute(){
-        return $this->basePath.'/'.$this->config('path.resources');
-    }
-
-    public function getStoragePathAttribute(){
-        return $this->basePath.'/'.$this->config('path.storage');
-    }
-
-    public function getWpPropertiesPathAttribute(){
-        return $this->basePath.'/'.$this->config('path.wp_properties');
-    }
-
-    public function getBaseUriAttribute(){
+    public function getBaseUriAttribute()
+    {
         return $this->baseUri;
     }
 
-    public function getPublicUriAttribute(){
-        return $this->baseUri.'/'.$this->config('path.public');;
+    public function getPublicUriAttribute()
+    {
+        return $this->baseUri.'/'.$this->config->get('path.public');
     }
 
-    public function getCssAttribute(){
+    public function getCssAttribute()
+    {
         return $this->baseUri . '/public/css';
     }
 
-    public function getJsAttribute(){
+    public function getJsAttribute()
+    {
         return $this->baseUri . '/public/js';
     }
 
-    public function getImagesAttribute(){
+    public function getImagesAttribute()
+    {
         return $this->baseUri . '/public/images';
     }
 
-    public function vendor( $vendor = "setranmedia" ){
+    public function vendor( $vendor = "setranmedia" )
+    {
         return $this->baseUri . "/vendor/$vendor";
     }
 
-    public function config($key=null,$default=null){
-        if($key) return $this->configer->get($key,$default);
-        return $this->configer;
-    }
+    public function storage()
+    {
 
-    public function env( $key, $default = null ){
-        return wpbones_env( $key, $default );
-    }
-
-    public function view( $key = null, $data = null ){
-
-        if($key) $this->viewer->setKey($key);
-        if($data) $this->viewer->setData($data);
-
-        return $this->viewer;
+        return $this->storager;
 
     }
 
-    public function isAjax(){
-        if ( defined( 'DOING_AJAX' ) ) {
+    public function isAjax()
+    {
+        if (defined('DOING_AJAX')) {
             return true;
         }
-        if ( isset( $_SERVER[ 'HTTP_X_REQUESTED_WITH' ] ) && strtolower( $_SERVER[ 'HTTP_X_REQUESTED_WITH' ] ) == 'xmlhttprequest') {
+        if (
+            isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER[ 'HTTP_X_REQUESTED_WITH' ]) == 'xmlhttprequest'
+        ) {
             return true;
         }
 
         return false;
     }
 
-    public function getPageUrl( $pageSlug ){
-        return add_query_arg( array( 'page' => $pageSlug ), admin_url( 'admin.php' ) );
+    public function getPageUrl( $pageSlug )
+    {
+        return add_query_arg(array('page' => $pageSlug), admin_url('admin.php'));
     }
 
-    public function provider( $name ){
+    public function provider( $name )
+    {
 
-        foreach ( $this->provides as $key => $value ) {
+        foreach ($this->provides as $key => $value) {
 
-            if ( $key == $name ) {
+            if ($key == $name) {
                 return $value;
             }
         }
@@ -218,40 +226,31 @@ class Plugin extends Container implements PluginContract
     |
     */
 
-    public function init(){
-        $init = $this->config()->get('plugin',false);
+    public function init()
+    {
+        $init = $this->config->get('plugin',false);
 
-        if ( is_array( $init ) ) {
+        if (is_array($init)) {
 
             // Here we are going to init Service Providers
 
-
-            // Shortcodes Service Provider
-            if ( isset( $init[ 'shortcodes' ] ) && ! empty( $init[ 'shortcodes' ] ) ) {
-                foreach ( $init[ 'shortcodes' ] as $className ) {
-                    $object = new $className;
-                    $object->register();
-                    $this->provides[ $className ] = $object;
-                }
-            }
-
             // Ajax Service Provider
-            if ( $this->isAjax() ) {
-                if ( isset( $init[ 'ajax' ] ) && ! empty( $init[ 'ajax' ] ) ) {
-                    foreach ( $init[ 'ajax' ] as $className ) {
+            if ($this->isAjax()) {
+                if (isset($init['ajax']) && !empty($init['ajax'])) {
+                    foreach ($init['ajax'] as $className) {
                         $object = new $className;
                         $object->register();
-                        $this->provides[ $className ] = $object;
+                        $this->provides[$className] = $object;
                     }
                 }
             }
 
             // Custom service provider
-            if ( isset( $init[ 'providers' ] ) && ! empty( $init[ 'providers' ] ) ) {
-                foreach ( $init[ 'providers' ] as $className ) {
+            if (isset($init['providers']) && !empty($init['providers'])) {
+                foreach ($init['providers'] as $className) {
                     $object = new $className;
                     $object->register();
-                    $this->provides[ $className ] = $object;
+                    $this->provides[$className] = $object;
                 }
             }
         }
@@ -260,10 +259,11 @@ class Plugin extends Container implements PluginContract
     /**
     * Fires before the administration menu loads in the admin.
     */
-    public function admin_menu(){
+    public function adminMenu()
+    {
         global $admin_page_hooks, $_registered_pages, $_parent_pages;
 
-        $menus = $this->config()->get('menus',false);
+        $menus = $this->config->get('menus',false);
 
         if ( ! empty( $menus ) && is_array( $menus ) ) {
 
@@ -339,7 +339,7 @@ class Plugin extends Container implements PluginContract
         }
 
         // custom hidden pages
-        $pages = $this->config()->get('routes',false);
+        $pages = $this->config->get('routes',false);
 
         if ( ! empty( $pages ) && is_array( $pages ) ) {
             foreach ( $pages as $pageSlug => $page ) {
@@ -367,10 +367,10 @@ class Plugin extends Container implements PluginContract
         $this->options->delta();
 
         // include your own activation
-        $activation = include_once $this->wpPropertiesPath . '/hooks/activation.php';
+        $activation = include_once $this->wp_properties_path . '/hooks/activation.php';
 
         // migrations
-        foreach ( glob( $this->databasePath . '/migrations/*.php' ) as $filename ) {
+        foreach ( glob( $this->database_path . '/migrations/*.php' ) as $filename ) {
             include $filename;
             foreach ( $this->getFileClasses( $filename ) as $className ) {
                 $instance = new $className;
@@ -378,7 +378,7 @@ class Plugin extends Container implements PluginContract
         }
 
         // seeders
-        foreach ( glob( $this->databasePath . '/seeds/*.php' ) as $filename ) {
+        foreach ( glob( $this->database_path . '/seeds/*.php' ) as $filename ) {
             include $filename;
             foreach ( $this->getFileClasses( $filename ) as $className ) {
                 $instance = new $className;
@@ -391,7 +391,7 @@ class Plugin extends Container implements PluginContract
     *
     */
     public function deactivation(){
-        $deactivation = include_once $this->wpPropertiesPath . '/hooks/deactivation.php';
+        $deactivation = include_once $this->wp_properties_path . '/hooks/deactivation.php';
     }
 
     // -- private
@@ -434,25 +434,28 @@ class Plugin extends Container implements PluginContract
     /**
     * Return the list of classes in a PHP file.
     *
-    * @param string $filename A PHP Filename file.
-    *
-    * @return array|bool
+    * @param  string  $fileName
+    * @return mixed
     */
-    private function getFileClasses( $filename )
+    private function getFileClasses( $fileName )
     {
-        $code = file_get_contents( $filename );
+        $code = file_get_contents($fileName);
 
-        if ( empty( $code ) ) {
+        if (empty($code)) {
             return false;
         }
 
         $classes = array();
-        $tokens  = token_get_all( $code );
-        $count   = count( $tokens );
-        for ( $i = 2; $i < $count; $i++ ) {
-            if ( $tokens[ $i - 2 ][ 0 ] == T_CLASS && $tokens[ $i - 1 ][ 0 ] == T_WHITESPACE && $tokens[ $i ][ 0 ] == T_STRING ) {
-                $class_name = $tokens[ $i ][ 1 ];
-                $classes[]  = $class_name;
+        $tokens  = token_get_all($code);
+        $count   = count($tokens);
+        for ($i = 2; $i < $count; $i++) {
+            if (
+                $tokens[$i - 2][0] == T_CLASS &&
+                $tokens[$i - 1][0] == T_WHITESPACE &&
+                $tokens[$i][0] == T_STRING
+            ) {
+                $className = $tokens[$i][1];
+                $classes[]  = $className;
             }
         }
         return $classes;

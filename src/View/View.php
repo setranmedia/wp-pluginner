@@ -103,9 +103,9 @@ class View
 
             // make available plugin instance
             $plugin = $this->container;
-            $blade = new Blade($plugin->resourcePath . '/views', $plugin->storagePath . '/plugin/views');
+            $blade = new Blade($plugin->resource_path . '/views', $plugin->storage_path . '/plugin/views');
             if ( ! is_null( $this->data ) && is_array( $this->data ) ) {
-                echo $blade->make($this->key, $this->data)->with('plugin',$plugin);
+                echo $blade->view()->make($this->key, $this->data)->with('plugin',$plugin);
             }
             echo $blade->view()->make($this->key)->with('plugin',$plugin);
         };

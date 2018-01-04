@@ -4,7 +4,7 @@ namespace SetranMedia\WpPluginner\Routing;
 
 use SetranMedia\WpPluginner\View\View;
 use SetranMedia\WpPluginner\Foundation\Http\Request;
-use SetranMedia\WpPluginner\Support\Str;
+use Illuminate\Support\Str;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
