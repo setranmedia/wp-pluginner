@@ -1,16 +1,14 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Model;
+namespace SetranMedia\WpPluginner\Providers;
 
-use SetranMedia\WpPluginner\Support\ServiceProvider;
+use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
-use Illuminate\Container\Container;
-use Exception;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class ModelServiceProvider extends ServiceProvider {
+class DatabaseServiceProvider extends ServiceProvider {
     public function register()
     {
         global $wpdb;
@@ -25,9 +23,13 @@ class ModelServiceProvider extends ServiceProvider {
             'collation' => 'utf8_unicode_ci',
             'prefix'    => $wpdb->prefix,
         ]);
-        $capsule->setEventDispatcher(new Dispatcher(new Container));
+        $capsule->setEventDispatcher(new Dispatcher($this->app));
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
+
+        $this->app->bind('db', function () use ($capsule) {
+            return $capsule->getDatabaseManager();
+        }, true);
     }
 
 }

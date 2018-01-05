@@ -1,14 +1,12 @@
 <?php
 
-namespace SetranMedia\WpPluginner\View;
-
-use SetranMedia\WpPluginner\Container\Container;
+namespace SetranMedia\WpPluginner\Support;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 class View
 {
-    protected $container;
+    protected $plugin;
     protected $key;
     protected $data;
 
@@ -19,15 +17,9 @@ class View
     protected $styles  = [];
     protected $scripts = [];
 
-    public function __construct( $container )
+    public function __construct( $plugin )
     {
-        $this->container = $container;
-    }
-
-    protected function filename(){
-        $filename = str_replace( '.', '/', $this->key ) . '.php';
-
-        return $filename;
+        $this->plugin = $plugin;
     }
 
     protected function admin_print_styles(){
@@ -90,7 +82,7 @@ class View
         if($key) $this->key = $key;
         if($data) $this->data = $data;
 
-        if ( ! $this->container->isAjax() ) {
+        if ( ! $this->plugin->isAjax() ) {
             $this->admin_enqueue_scripts();
             $this->admin_localize_scripts();
             $this->admin_print_styles();
@@ -102,16 +94,16 @@ class View
         $func = function () {
 
             // make available plugin instance
-            $plugin = $this->container;
-            $blade = new Blade($plugin->resource_path . '/views', $plugin->storage_path . '/plugin/views');
+            $plugin = $this->plugin;
+            $factory = $plugin->container['view'];
             if ( ! is_null( $this->data ) && is_array( $this->data ) ) {
-                echo $blade->view()->make($this->key, $this->data)->with('plugin',$plugin);
+                echo $factory->make($this->key, $this->data)->with('plugin',$plugin);
             }
-            echo $blade->view()->make($this->key)->with('plugin',$plugin);
+            echo $factory->make($this->key)->with('plugin',$plugin);
         };
 
 
-        if ( $this->container->isAjax() ) {
+        if ( $this->plugin->isAjax() ) {
             ob_start();
             $func();
             $content = ob_get_contents();

@@ -1,6 +1,6 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Foundation;
+namespace SetranMedia\WpPluginner\Support;
 
 use Illuminate\Config\Repository;
 use Symfony\Component\Finder\Finder;
