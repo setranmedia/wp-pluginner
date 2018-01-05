@@ -2,13 +2,20 @@
 
 namespace SetranMedia\WpPluginner\Foundation;
 
+use SetranMedia\WpPluginner\Container;
+use SetranMedia\WpPluginner\Providers\ConfigServiceProvider;
+use SetranMedia\WpPluginner\Providers\ViewServiceProvider;
+use SetranMedia\WpPluginner\Providers\DatabaseServiceProvider;
+
 use SetranMedia\WpPluginner\Database\WordPressOption;
-use SetranMedia\WpPluginner\View\View;
+use SetranMedia\WpPluginner\Support\View;
 use SetranMedia\WpPluginner\Foundation\Http\Request;
 use SetranMedia\WpPluginner\Foundation\Config;
+
 use Illuminate\Support\Str;
-use League\Flysystem\Filesystem;
-use League\Flysystem\Adapter\Local;
+use Illuminate\Filesystem\FilesystemServiceProvider;
+use Illuminate\Events\EventServiceProvider;
+use Illuminate\Cache\CacheServiceProvider;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
@@ -24,10 +31,10 @@ class Plugin
     protected $provides = [];
     private $_options = null;
     private $_request = null;
-    protected $_config = null;
-    protected $_view = null;
-    protected $_storage = null;
+    private $_view = null;
+
     public $slug = "";
+    public $container;
 
     public function __construct( $basePath )
     {
@@ -74,6 +81,14 @@ class Plugin
     {
         $this->file = trailingslashit($this->basePath) . 'plugin.php';
 
+        $this->container = new Container($this->file);
+        with(new ConfigServiceProvider($this->container))->register();
+        with(new CacheServiceProvider($this->container))->register();
+        with(new EventServiceProvider($this->container))->register();
+        with(new FilesystemServiceProvider($this->container))->register();
+        with(new ViewServiceProvider($this->container))->register();
+        with(new DatabaseServiceProvider($this->container))->register();
+
         $this->baseUri = rtrim(plugin_dir_url($this->file), '\/');
         if (!function_exists('get_plugin_data')) {
             require_once(ABSPATH . 'wp-admin/includes/plugin.php');
@@ -81,9 +96,6 @@ class Plugin
         $this->pluginData = get_plugin_data($this->file, false);
 
         static::$instance = $this;
-
-        $storageAdapter = new Local($this->storage_path.'/app');
-        $this->_storage = new Filesystem($storageAdapter);
 
         return $this;
     }
@@ -120,12 +132,17 @@ class Plugin
 
     public function getConfigAttribute()
     {
-        if (is_null($this->_config)) {
-            $this->_config = new Config();
-            $this->_config->loadConfigurationFiles($this->config_path);
-        }
+        return $this->container['config'];
+    }
 
-        return $this->_config;
+    public function getStorageAttribute()
+    {
+        return $this->container['filesystem'];
+    }
+
+    public function getCacheAttribute()
+    {
+        return $this->container['cache'];
     }
 
     public function getViewAttribute()
@@ -175,13 +192,6 @@ class Plugin
     public function vendor( $vendor = "setranmedia" )
     {
         return $this->baseUri . "/vendor/$vendor";
-    }
-
-    public function storage()
-    {
-
-        return $this->storager;
-
     }
 
     public function isAjax()
