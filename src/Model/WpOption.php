@@ -1,6 +1,8 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Database\Eloquent;
+namespace SetranMedia\WpPluginner\Model;
+
+use SetranMedia\WpPluginner\Foundation\Model;
 
 class WpOption extends Model {
 

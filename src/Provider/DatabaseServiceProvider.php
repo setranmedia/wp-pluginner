@@ -1,8 +1,9 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Providers;
+namespace SetranMedia\WpPluginner\Provider;
 
-use Illuminate\Support\ServiceProvider;
+use SetranMedia\WpPluginner\Foundation\ServiceProvider;
+
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Illuminate\Events\Dispatcher;
 
@@ -23,13 +24,13 @@ class DatabaseServiceProvider extends ServiceProvider {
             'collation' => 'utf8_unicode_ci',
             'prefix'    => $wpdb->prefix,
         ]);
-        $capsule->setEventDispatcher(new Dispatcher($this->app));
+        $capsule->setEventDispatcher(new Dispatcher($this->plugin));
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
 
-        $this->app->bind('db', function () use ($capsule) {
+        $this->plugin->singleton('db', function () use ($capsule) {
             return $capsule->getDatabaseManager();
-        }, true);
+        });
     }
 
 }

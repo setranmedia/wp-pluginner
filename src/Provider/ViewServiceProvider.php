@@ -1,11 +1,10 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Providers;
+namespace SetranMedia\WpPluginner\Provider;
 
-use SetranMedia\WpPluginner\Container\Container;
+use SetranMedia\WpPluginner\Foundation\ServiceProvider;
 
 use Illuminate\View\Engines\PhpEngine;
-use Illuminate\Support\ServiceProvider;
 use Illuminate\View\Engines\FileEngine;
 use Illuminate\View\Engines\CompilerEngine;
 use Illuminate\View\Engines\EngineResolver;
@@ -33,22 +32,22 @@ class ViewServiceProvider extends ServiceProvider
      */
     public function registerFactory()
     {
-        $this->app->singleton('view', function ($app) {
+        $this->plugin->singleton('view', function ($plugin) {
             // Next we need to grab the engine resolver instance that will be used by the
             // environment. The resolver will be used by an environment to get each of
             // the various engine implementations such as plain PHP or Blade engine.
-            $resolver = $app['view.engine.resolver'];
+            $resolver = $plugin['view.engine.resolver'];
 
-            $finder = $app['view.finder'];
+            $finder = $plugin['view.finder'];
 
-            $env = new Factory($resolver, $finder, $app['events']);
+            $env = new Factory($resolver, $finder, $plugin['events']);
 
             // We will also set the container instance on this view environment since the
             // view composers may be classes registered in the container, which allows
             // for great testable, flexible composers for the application developer.
-            $env->setContainer($app);
+            $env->setContainer($plugin);
 
-            $env->share('app', $app);
+            $env->share('plugin', $plugin);
 
             return $env;
         });
@@ -61,8 +60,8 @@ class ViewServiceProvider extends ServiceProvider
      */
     public function registerViewFinder()
     {
-        $this->app->bind('view.finder', function ($app) {
-            return new FileViewFinder($app['files'], $app['config']['view.paths']);
+        $this->plugin->bind('view.finder', function ($plugin) {
+            return new FileViewFinder($plugin['files'], $plugin['config']['view.paths']);
         });
     }
 
@@ -73,7 +72,7 @@ class ViewServiceProvider extends ServiceProvider
      */
     public function registerEngineResolver()
     {
-        $this->app->singleton('view.engine.resolver', function () {
+        $this->plugin->singleton('view.engine.resolver', function () {
             $resolver = new EngineResolver;
 
             // Next, we will register the various view engines with the resolver so that the
@@ -124,14 +123,14 @@ class ViewServiceProvider extends ServiceProvider
         // The Compiler engine requires an instance of the CompilerInterface, which in
         // this case will be the Blade compiler, so we'll first create the compiler
         // instance to pass into the engine so it can compile the views properly.
-        $this->app->singleton('blade.compiler', function () {
+        $this->plugin->singleton('blade.compiler', function () {
             return new BladeCompiler(
-                $this->app['files'], $this->app['config']['view.compiled']
+                $this->plugin['files'], $this->plugin['config']['view.compiled']
             );
         });
 
         $resolver->register('blade', function () {
-            return new CompilerEngine($this->app['blade.compiler']);
+            return new CompilerEngine($this->plugin['blade.compiler']);
         });
     }
 

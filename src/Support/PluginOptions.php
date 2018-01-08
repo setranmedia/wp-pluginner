@@ -1,45 +1,18 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Database;
+namespace SetranMedia\WpPluginner\Support;
+
+use SetranMedia\WpPluginner\Model\WpOption;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class WordPressOption implements \ArrayAccess
+class PluginOptions implements \ArrayAccess
 {
 
-    /**
-    * Name of table.
-    *
-    * @var string
-    */
-    protected $tableName = "";
+    protected $optionsSave = false;
+    protected $optionsName = null;
+    protected $optionsData = [];
 
-    /**
-    * Table description fields.
-    *
-    * @var array
-    */
-    protected $fields = [
-        'option_id',
-        'option_name',
-        'option_value',
-        'autoload'
-    ];
-
-    /**
-    * An instance of Plugin class or null.
-    *
-    * @var Plugin
-    */
-    protected $plugin = null;
-    protected $options_name = null;
-
-    /**
-    * Option record.
-    *
-    * @var array|null|object|void
-    */
-    protected $row;
 
     /**
     * Decoded json form option_value.
@@ -53,42 +26,28 @@ class WordPressOption implements \ArrayAccess
     *
     * @param $plugin
     */
-    public function __construct( $plugin = null )
+    public function __construct( $config = null )
     {
-        global $wpdb;
-
-        $this->tableName = $wpdb->options;
-
-        if ( ! is_null( $plugin ) ) {
-            $this->plugin = $plugin;
-
-            $this->options_name = $plugin->config->get('options.name', false);
-            $options = $plugin->config->get('options.data', []);
-
+        $this->optionsSave = isset($config['save']) ? $config['save'] : false;
+        $this->optionsName = isset($config['name']) ? $config['name'] : false;
+        $this->optionsData = isset($config['data']) && is_array($config['data']) ? $config['data'] : [];
+        if (
+            $this->optionsName &&
+            is_array($this->optionsData) &&
+            !empty($this->optionsData)
+        ) {
+            $this->_value = $this->optionsData;
+            $options = WpOption::firstOrCreate(
+                ['option_name' => $this->optionsName],
+                ['option_value' => $this->optionsData]
+            );
             if (
-                $this->options_name &&
-                $plugin->config->get('options.save', false) &&
-                is_array($options) &&
-                !empty($options)
+                $options &&
+                isset($options->option_value) &&
+                $options->option_value
             ) {
-                // in $this->row you'll fond a stdClass with column/property
-                $this->row = $wpdb->get_row( "SELECT * FROM {$this->tableName} WHERE option_name='{$this->options_name}'" );
-
-                if (is_null($this->row)) {
-                    $values = [
-                        'option_name'  => $this->options_name,
-                        'option_value' => json_encode( $options )
-                    ];
-                    $result = $wpdb->insert( $this->tableName, $values );
-
-                    $this->row = $wpdb->get_row( "SELECT * FROM {$this->tableName} WHERE option_name='{$this->options_name}'" );
-                }
-
-                if ( isset( $this->row->option_value ) && ! empty( $this->row->option_value ) ) {
-                    $this->_value = (array) json_decode( $this->row->option_value, true );
-                }
+                $this->_value = (array) json_decode( $options->option_value, true );
             }
-
         }
     }
 
@@ -219,8 +178,6 @@ class WordPressOption implements \ArrayAccess
     */
     public function delete( $path = '' )
     {
-        global $wpdb;
-
         if ( empty( $path ) ) {
             $this->_value = [];
         }
@@ -240,12 +197,10 @@ class WordPressOption implements \ArrayAccess
                 $array = &$array[ $key ];
             }
         }
-
-        $values = [
-            'option_value' => json_encode( $this->_value )
-        ];
-
-        $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
+        $result = WpOption::updateOrCreate(
+            ['option_name' => $this->optionsName],
+            ['option_value' => json_encode( $this->_value )]
+        );
 
         return $this->_value;
     }
@@ -259,7 +214,6 @@ class WordPressOption implements \ArrayAccess
     */
     public function update( $options = [] )
     {
-        global $wpdb;
 
         if ( is_null( $this->row ) ) {
             return $this->reset();
@@ -267,13 +221,13 @@ class WordPressOption implements \ArrayAccess
 
         $mergeOptions = array_replace_recursive( $this->_value, $options );
 
-        $values = [
-            'option_value' => json_encode( $mergeOptions )
-        ];
+        $result = WpOption::updateOrCreate(
+            ['option_name' => $this->optionsName],
+            ['option_value' => json_encode( $mergeOptions )]
+        );
 
-        $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
 
-        $this->_value = (array) json_decode( $values[ 'option_value' ], true );
+        $this->_value = (array) $mergeOptions;
 
         return $result;
 
@@ -286,23 +240,17 @@ class WordPressOption implements \ArrayAccess
     */
     public function delta()
     {
-        global $wpdb;
 
-        if ( is_null( $this->row ) ) {
-            return $this->reset();
-        }
+        $mergeOptions = $this->__delta( $this->optionsData, $this->_value );
 
-        $options = $this->plugin->config->get('options.data', []);
 
-        $mergeOptions = $this->__delta( $options, $this->_value );
+        $result = WpOption::updateOrCreate(
+            ['option_name' => $this->optionsName],
+            ['option_value' => json_encode( $mergeOptions )]
+        );
 
-        $values = [
-            'option_value' => json_encode( $mergeOptions )
-        ];
 
-        $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
-
-        $this->_value = (array) json_decode( $values[ 'option_value' ], true );
+        $this->_value = (array) $mergeOptions;
 
         return $result;
 
@@ -315,18 +263,14 @@ class WordPressOption implements \ArrayAccess
     */
     public function reset()
     {
-        global $wpdb;
 
-        $options = include $this->plugin->wpPropertiesPath . '/options.php';
+        $result = WpOption::updateOrCreate(
+            ['option_name' => $this->optionsName],
+            ['option_value' => json_encode( $this->optionsData )]
+        );
 
-        $values = [
-            'option_name'  => $this->options_name,
-            'option_value' => json_encode( $options )
-        ];
 
-        $result = $wpdb->update( $this->tableName, $values, [ 'option_name' => $this->options_name ] );
-
-        $this->_value = (array) json_decode( $values[ 'option_value' ], true );
+        $this->_value = (array) $mergeOptions;
 
         return $result;
 

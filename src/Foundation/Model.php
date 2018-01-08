@@ -1,6 +1,6 @@
 <?php
 
-namespace SetranMedia\WpPluginner\Database\Eloquent;
+namespace SetranMedia\WpPluginner\Foundation;
 
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 
