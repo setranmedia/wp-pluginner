@@ -20,12 +20,16 @@ class DevController extends Controller
      * $this->attributes['capability'],
      * $this->attributes['slug'],
      */
-    public function __construct(WpPluginner $plugin, $attributes = array())
+    public function __construct($attributes = array(), $namespace = null)
     {
-        parent::__construct($plugin, $attributes);
+        parent::__construct($attributes, $namespace);
 
         $this->attributes['config'] = $this->plugin->config();
         $this->attributes['request'] = $this->plugin->request();
+
+        if($this->plugin->bound('router')){
+           $this->attributes['routes'] = $this->plugin['router'];
+       }
 
         $this->attributes['plugin'] = $this->plugin;
 
@@ -44,6 +48,11 @@ class DevController extends Controller
             $this->attributes['paths']['sessions'] = $this->plugin->config()->get('session.files');
             $this->attributes['sizes']['sessions'] = $this->calcDiskSize($this->attributes['paths']['sessions']);
         }
+        if ($this->plugin->bound('router') && $this->plugin->config()->get('routes.cache')) {
+            $this->attributes['paths']['routes'] = $this->plugin->config()->get('routes.compiled');
+            $this->attributes['sizes']['routes'] = $this->calcDiskSize($this->attributes['paths']['routes']);
+        }
+
         if ($this->plugin->bound('cache')) {
             $this->attributes['paths']['objects'] = $this->plugin->config()->get('cache.stores.file.path');
             $this->attributes['sizes']['objects'] = $this->calcDiskSize($this->attributes['paths']['objects']);

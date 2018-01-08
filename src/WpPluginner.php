@@ -101,6 +101,7 @@ class WpPluginner extends Container
 			/**
 			 * Use Cached Routes if Available
 			 */
+
 			if ($this['config']->get('routes.cache') && $this['files']->exists($this['config']->get('routes.compiled'))) {
 				$contents = $this['files']->get($this['config']->get('routes.compiled'));
 				if (!empty($contents)) {
@@ -112,8 +113,9 @@ class WpPluginner extends Container
 				$route = $this['router'];
 				$response = $this['response'];
 				//Include Routes
-				if($this['files']->exists($this->base_path . 'app/Http/routes.php')){
-					require_once $this->base_path . 'app/Http/routes.php';
+				if($this['files']->exists($this->base_path . '/app/Http/routes.php')){
+
+					require_once $this->base_path . '/app/Http/routes.php';
 				}
 			}
 			/**

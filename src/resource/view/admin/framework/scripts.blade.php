@@ -3,7 +3,7 @@
         $('.{{ $slug.'_flush_sessions' }}').click(function (e) {
             e.preventDefault();
             $.post('{{admin_url('admin-ajax.php')}}', {
-                'action': '{{ $slug.'_dev' }}',
+                'action': '{{ $slug }}',
                 '_flush': 'sessions'
             }, function (response) {
                 alert(response);
@@ -12,7 +12,7 @@
         $('.{{ $slug.'_flush_objects' }}').click(function (e) {
             e.preventDefault();
             $.post('{{admin_url('admin-ajax.php')}}', {
-                'action': '{{ $slug.'_dev' }}',
+                'action': '{{ $slug }}',
                 '_flush': 'objects'
             }, function (response) {
                 alert(response);

@@ -54,9 +54,9 @@ class AdminFactory
                     $plugin = $this->plugin; //needed for dev controller
                     list( $controller, $method ) = explode( '@', $attributes['controller'] );
                     $this->plugin->when($controller)
-                        ->needs('SetranMedia\WpPluginner\WpPluginner')
+                        ->needs('$namespace')
                         ->give(function(){
-                            return $this->plugin;
+                            return $this->plugin['config']->get('plugin.namespace');
                         });
 
                     $this->plugin->when($controller)
@@ -102,9 +102,9 @@ class AdminFactory
                     $plugin = $this->plugin; //needed for dev controller
                     list( $controller, $method ) = explode( '@', $attributes['controller'] );
                     $this->plugin->when($controller)
-                        ->needs('SetranMedia\WpPluginner\WpPluginner')
+                        ->needs('$namespace')
                         ->give(function(){
-                            return $this->plugin;
+                            return $this->plugin['config']->get('plugin.namespace');
                         });
 
                     $this->plugin->when($controller)
